@@ -12,8 +12,11 @@ Code cleanup has to be done, but I think you would like it anyway.
 
 # Simple user manual:
 Knob 1 selects the mute of the individual drums in a binary fashion. Input 1 can be used, when Knob 1 is maxed.
+
 Knob 2 selects the drumpattern, again input 2 can be used when Knob 2 is maxed
+
 Knob 3 is a attenuator for the Trigger input, nice to stop the machine midways,
+
 Input 3 is the trigger input.
 
 # Thanks to
