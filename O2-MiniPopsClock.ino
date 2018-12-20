@@ -8,6 +8,8 @@
 //
 // External clock input modification (pin 2) Mark Graves 2018
 //
+// Port to Ginko Grains Erik Mast 2018
+//
 // Free for non commercial use
 //
 // NANO Modules
@@ -18,18 +20,51 @@
 // http://janostman.wordpress.com
 
 // TODO LED flash in time with sync
-// set config for external/internal?
+
+ /*
+  * Usage:
+  * 
+  * Standalone:
+  * Pot 1 = pattern
+  * Pot 2 = mutes
+  * Pot 3 = tempo
+  * 
+  * Sync mode
+  * Pot 1 = pattern
+  * Pot 2 = mutes
+  * Pot 3 = attenuator for clock in V1
+  * Pot 3 = doens't do anything in V2
+  * 
+  * Note: check defines if you install it on your Grains
+  */
+
+
 
 #include <avr/interrupt.h>
 #include <avr/io.h>
 #include <avr/pgmspace.h>
 
 #define DEBUG   0
-#define NO_MUTE
-#define NO_AMUX
-#define NO_SEQCONTROL
-#define USEGRAINSCONFIG
-#define USEGRAINSINPUT3SYNC 1
+
+/*
+ * USEGRAINSINPUT3SYNC
+ * rename or remove for standalone use
+ */
+#define USEGRAINSINPUT3SYNC 
+
+/*
+ * set this if you have a V1. Remove or rename if you have a version higher than V1
+ */
+ #define _GRAINSV1 
+
+/*
+ * No configuration beyond this point
+ */
+#ifdef GRAINSV1 
+#define CLOCKINPUT 0
+#else
+#define CLOCKINPUT 3
+#endif
 
 #ifndef cbi
 #define cbi(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
@@ -693,37 +728,16 @@ void setup() {
     Serial.begin(9600);
   }
 
-#ifndef NO_MUTE
-  //Drum mute inputs
-  //    pinMode(2,INPUT_PULLUP);  pin now the external clokc input
-  pinMode(3, INPUT_PULLUP);
-  pinMode(4, INPUT_PULLUP);
-  pinMode(5, INPUT_PULLUP);
-  pinMode(6, INPUT_PULLUP);
-  pinMode(7, INPUT_PULLUP);
-  pinMode(8, INPUT_PULLUP);
-  pinMode(9, INPUT_PULLUP);
-#endif
-#ifndef NO_SEQCONTROL
-  pinMode(10, INPUT_PULLUP); //RUN - Stop input
-  pinMode(12, OUTPUT);      //Reset output
   pinMode(13, OUTPUT);      //Clock output
-#endif
-#ifndef NO_AMUX
-  pinMode(14, OUTPUT);      //SEQ cnt output
-  pinMode(15, OUTPUT);
-  pinMode(16, OUTPUT);
-  pinMode(17, OUTPUT);
-#endif
+
   //8-bit PWM DAC pin
   pinMode(11, OUTPUT);
 
   // interrupt for external clock input (pin 2)
   // set Mode as required to RISING or FALLING for active clock edge
 
-#ifndef USEGRAINSCONFIG
-  attachInterrupt(digitalPinToInterrupt(2), ClockISR, RISING);
-#endif
+  //attachInterrupt(digitalPinToInterrupt(2), ClockISR, RISING);
+
   // Set up Timer 1 to send a sample every interrupt.
   cli();
   // Set CTC mode
@@ -804,11 +818,9 @@ void loop() {
   uint8_t stepcnt = 0;
   uint16_t tempo = 3500;
   uint16_t tempocnt = 1;
-#ifdef USEGRAINSCONFIG
-  uint8_t MUX = 0;
-#else
-  uint8_t MUX = 4;
-#endif
+
+  uint8_t MUX = 0; // for Grains, start with A0
+
   uint8_t patselect = 13;
   uint8_t patlength = pgm_read_byte_near(patlen + patselect);
   uint8_t NewPatselect;
@@ -863,11 +875,7 @@ void loop() {
 
       //----------------------------------------------------------------------------
       //--------- Clock output block ----------------------------------------------
-#ifdef NO_SEQCONTROL
       if (true) {      // for the time being keep running
-#else
-      if (digitalReadFast(10)) {      // only if "run"
-#endif
         if (!(tempocnt--)) {         // if tempo count is zero; else decrement temp count
           tempocnt = tempo;          // restart the tempo count
           if (activeRead) {
@@ -875,9 +883,10 @@ void loop() {
           }
           digitalWriteFast(13, HIGH); // ext Clock output goes Hi
 
-#ifdef USEGRAINSCONFIG
-        if (!USEGRAINSINPUT3SYNC) activeClock = 1;
-#endif          
+#ifndef USEGRAINSINPUT3SYNC
+          activeClock = 1;
+#endif
+
         }   // end of if !(tempocnt)  - that's it  - we just output the clock on pin 13
 
         if (micros() - previousMillis >= 100) {   // is it time for ext clokc to go low ?
@@ -896,30 +905,16 @@ void loop() {
           activeClock = 0;          // reset the clock event flag
 
           uint8_t trig = pgm_read_byte_near(pattern + (patselect << 4) + stepcnt++);  // read this pattern step
-#ifndef NO_AMUX
-          PORTC = stepcnt;                                                           // sequencer control output           
-#endif
 
-#ifndef NO_MUTE
-          mask = (PIND >> 2) | ((PINB & 3) << 6) | 2 ;                      // added "| 2" ("or 2") to disable mute on pin 2 (it is now the clock input)
           trig &= mask;                                                             // mask the triggers with the mute controls
-#endif          
-#ifdef USEGRAINSCONFIG
-          trig &= mask;                                                             // mask the triggers with the mute controls
-#endif
+
           if (stepcnt > patlength) stepcnt = 0;
 
           if (stepcnt == 0) {  // start of bar
-#ifndef NO_SEQCONTROL
-            digitalWriteFast(12, HIGH); //Reset out goes high
-#endif
             patselect = NewPatselect;  // only update pattern at start of new bar
             patlength = NewPatlength;
           }
 
-#ifndef NO_SEQCONTROL
-          if (stepcnt != 0) digitalWriteFast(12, LOW); //Reset out goes low
-#endif
 
           if (trig & 1) {
             samplepntQU = 0;
@@ -958,15 +953,6 @@ void loop() {
       }   // end of "if RUN"
     }    // end of "if (ringcount<255)"
 
-#ifndef NO_SEQCONTROL
-    if (!(digitalReadFast(10))) {  // if we are stopped
-      digitalWriteFast(13, LOW); //Clock out LOW
-      digitalWriteFast(12,LOW); //Reset out DISABLED
-      PORTC = 0;
-      stepcnt = 0;
-      tempocnt = 1;
-    }
-#endif
     //------------------------------------------------------------------------
 
 
@@ -975,39 +961,30 @@ void loop() {
     if (!(ADCSRA & 64)) {
 
       uint16_t value = ((ADCL + (ADCH << 8)) >> 3) + 1;
-#ifdef USEGRAINSCONFIG
-      if (MUX == 2) {
-        if (!USEGRAINSINPUT3SYNC) {
-          tempo = ((129-value) << 4) + 1250; //17633-1250
-        } else {
+
+      if (MUX == 1) {
           //mask = value; //1-128
           mask = 255-((ADCL + (ADCH << 8)) >> 2); //0-255
-        }
       }
-      if (MUX == 1) NewPatselect = (value - 1) >> 3;                            // save these for use at start of next bar
-      if (MUX == 1) NewPatlength = pgm_read_byte_near(patlen + patselect);      //
-
-      if ((MUX == 0) && (USEGRAINSINPUT3SYNC)) {
-          if ((value > 64) && !clockHigh) {
-            clockHigh = true;
-            activeClock = 1;
-          } else if ((value <= 64) && clockHigh) {
-            clockHigh = false;
-          }
+      if (MUX == 2) NewPatselect = (value - 1) >> 3;                            // save these for use at start of next bar
+      if (MUX == 2) NewPatlength = pgm_read_byte_near(patlen + patselect);      //
+#ifndef USEGRAINSINPUT3SYNC
+      if (MUX == 0) {
+          tempo = ((129-value) << 4) + 1250; //17633-1250
       }
 #else
-      if (MUX == 5) tempo = (value << 4) + 1250; //17633-1250
-      if (MUX == 4) NewPatselect = (value - 1) >> 3;                            // save these for use at start of next bar
-      if (MUX == 4) NewPatlength = pgm_read_byte_near(patlen + patselect);      //
+      if (MUX == CLOCKINPUT){
+            if ((value > 64) && !clockHigh) {
+              clockHigh = true;
+              activeClock = 1;
+            } else if ((value <= 64) && clockHigh) {
+              clockHigh = false;
+            }
+        }
 #endif
       MUX++;
       
-#ifdef USEGRAINSCONFIG
-//      if (MUX == 3) MUX = 1;
-      if (MUX == 4) MUX = 0;
-#else
-      if (MUX == 8) MUX = 4;
-#endif
+      if (MUX == 4) MUX = 0; //A0-A3
       ADMUX = 64 | MUX; //Select MUX
       sbi(ADCSRA, ADSC); //start next conversation
     };
