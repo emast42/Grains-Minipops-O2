@@ -19,7 +19,7 @@ Knob 2 selects the mute of the individual drums in a binary fashion. Input 2 can
 Knob 3 is a attenuator for the Trigger input, nice to stop the machine midways,
 Input 3 is then trigger input. In standalone mode (see config) Knob 3 sets the tempo.
 
-# Grains V1
+# Grains V2
 Knob 3 doesn't do anything, but sitting there being pretty.  In standalone mode (see config) Knob 3 sets the tempo.
 Input 3 is then trigger input. In standalone mode (see config) Knopb 3 sets the tempo.
 
