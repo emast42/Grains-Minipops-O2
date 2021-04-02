@@ -967,7 +967,7 @@ void loop() {
           mask = 255-((ADCL + (ADCH << 8)) >> 2); //0-255
       }
       if (MUX == 2) NewPatselect = (value - 1) >> 3;                            // save these for use at start of next bar
-      if (MUX == 2) NewPatlength = pgm_read_byte_near(patlen + patselect);      //
+      if (MUX == 2) NewPatlength = pgm_read_byte_near(patlen + NewPatselect);      //
 #ifndef USEGRAINSINPUT3SYNC
       if (MUX == 0) {
           tempo = ((129-value) << 4) + 1250; //17633-1250
