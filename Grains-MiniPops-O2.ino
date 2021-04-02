@@ -50,12 +50,12 @@
  * USEGRAINSINPUT3SYNC
  * rename or remove for standalone use
  */
-#define USEGRAINSINPUT3SYNC 
+#define _USEGRAINSINPUT3SYNC 
 
 /*
  * set this if you have a V1. Remove or rename if you have a version higher than V1
  */
- #define _GRAINSV1 
+#define GRAINSV1 
 
 /*
  * No configuration beyond this point
